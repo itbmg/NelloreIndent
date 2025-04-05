@@ -3017,12 +3017,12 @@
                     CollectionInventrySaveClick();
                     alert(msg);
                    // document.getElementById('txtPaidAmount').disabled = true;
-                    document.getElementById('BtnSave').value = "Edit";
                     if (msg == "Session Expired") {
                         window.location = "Login.aspx";
                     }
                     ////window.location.reload();
                     divCollectionsclick();
+                    document.getElementById('BtnSave').value = "Edit";
                 }
                 else {
                 }
@@ -3107,6 +3107,7 @@
                 var txtUnits = "";
                 var txtTubQty = "";
                 var txtQtypkts = "";
+                var txtQtyltrs = "";
                 var orderunitqty = "";
                 var Qty = 0;
                 var Rate = 0;
@@ -3145,7 +3146,7 @@
                         txtOrderTotal = $(this).find('#txtOrderTotal').text();
                         //orderunitqty = $(this).find('#txtUnitQty').val();
                         orderunitqty = $(this).find('#txtQtypkts').val();
-
+                        txtQtyltrs = $(this).find('#txtDupUnitQty').text();
                         txtUnitqty = $(this).find('#hdnUnitQty').val();
                         txtinvqty = $(this).find('#hdninvQty').val();
                         txtUnits = $(this).find('#hdnUnits').val();
@@ -3155,7 +3156,7 @@
                         txtPrvQty = $(this).find('#txtPrvQty').text();
                         txtTubQty = $(this).find('#txtTubQty').val();
                         txtQtypkts = $(this).find('#txtQtypkts').val();
-                        DataTable.push({ sno: txtsno, ProductCode: txtProductName, Productsno: txtProductSno, Qty: txtOrderQty, Rate: txtOrderRate, discountprice: hdnDiscountRate, Total: txtOrderTotal, Unitqty: txtUnitqty, invqty: txtinvqty, Units: txtUnits, orderunitqty: orderunitqty, orderunitRate: txtorderunitRate, Desciption: txtDescription, PrevQty: txtPrvQty, Qtypkts: txtQtypkts, tubQty: txtTubQty });
+                        DataTable.push({ sno: txtsno, ProductCode: txtProductName, Productsno: txtProductSno, Qty: txtOrderQty, Rate: txtOrderRate, discountprice: hdnDiscountRate, Total: txtOrderTotal, Unitqty: txtUnitqty, invqty: txtinvqty, Units: txtUnits, orderunitqty: txtQtyltrs, orderunitRate: txtorderunitRate, Desciption: txtDescription, PrevQty: txtPrvQty, Qtypkts: txtQtypkts, tubQty: txtTubQty });
                     }
                 });
                 var Sno = parseInt(txtsno) + 1;
