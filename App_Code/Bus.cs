@@ -3310,28 +3310,11 @@
                 string tripid = context.Session["TripID"].ToString();
                 string empid = context.Session["UserSno"].ToString();
                 DateTime dtDispDate = Convert.ToDateTime(IndentDate);
-                cmd = new MySqlCommand("SELECT inventory_monitor.Inv_Sno, inventory_monitor.BranchId, inventory_monitor.Qty, inventory_monitor.Sno, inventory_monitor.EmpId, inventory_monitor.lostQty FROM dispatch INNER JOIN dispatch_sub ON dispatch.sno = dispatch_sub.dispatch_sno INNER JOIN modifiedroutesubtable ON dispatch_sub.Route_id = modifiedroutesubtable.RefNo INNER JOIN inventory_monitor ON modifiedroutesubtable.BranchID = inventory_monitor.BranchId WHERE (dispatch.sno = @dispsno) AND (modifiedroutesubtable.EDate IS NULL) AND (modifiedroutesubtable.CDate <= @starttime) AND (inventory_monitor.Qty>0) OR (dispatch.sno = @dispsno) AND (modifiedroutesubtable.EDate > @starttime) AND (modifiedroutesubtable.CDate <= @starttime) AND (inventory_monitor.Qty>0)");
-                cmd.Parameters.AddWithValue("@dispsno", RouteId);
-                cmd.Parameters.AddWithValue("@starttime", DateConverter.GetHighDate(dtDispDate));
-                DataTable dtinventoryopp = vdm.SelectQuery(cmd).Tables[0];
-                cmd = new MySqlCommand("SELECT invtras.TransType, invtras.FromTran, invtras.ToTran, invtras.Qty, invtras.DOE, invmaster.sno AS invsno, invmaster.InvName FROM  invtransactions12 as invtras INNER JOIN invmaster ON invtras.B_inv_sno = invmaster.sno WHERE FromTran=@FromTran  ORDER BY invtras.DOE");
-                //cmd = new MySqlCommand("SELECT invtras.TransType, invtras.FromTran, invtras.ToTran, invtras.Qty, invtras.DOE, invmaster.sno AS invsno, invmaster.InvName FROM (SELECT TransType, FromTran, ToTran, Qty, EmpID, VarifyStatus, VTripId, VEmpId, Sno, B_inv_sno, DOE, VQty FROM invtransactions12 WHERE  (DOE BETWEEN @d1 AND @d2)  and ToTran=@ToTran) invtras INNER JOIN invmaster ON invtras.B_inv_sno = invmaster.sno ORDER BY invtras.DOE");
-                //cmd.Parameters.AddWithValue("@d1", DateConverter.GetLowDate());
-                //cmd.Parameters.AddWithValue("@d2", DateConverter.GetHighDate(dtDispDate));
-                cmd.Parameters.AddWithValue("@FromTran", tripid);
-                DataTable dtinventaryissued = vdm.SelectQuery(cmd).Tables[0];
-
-                cmd = new MySqlCommand("SELECT invtras.TransType, invtras.FromTran, invtras.ToTran, invtras.Qty, invtras.DOE, invmaster.sno AS invsno, invmaster.InvName FROM  invtransactions12 as invtras INNER JOIN invmaster ON invtras.B_inv_sno = invmaster.sno WHERE ToTran=@ToTran  ORDER BY invtras.DOE");
-                //cmd.Parameters.AddWithValue("@d1", DateConverter.GetLowDate(dtDispDate));
-                //cmd.Parameters.AddWithValue("@d2", DateConverter.GetHighDate(dtDispDate));
-                cmd.Parameters.AddWithValue("@ToTran", tripid);
-                DataTable dtinventaryreceived = vdm.SelectQuery(cmd).Tables[0];
 
                 cmd = new MySqlCommand("SELECT branchdata.BranchName, branchdata.sno, modifiedroutes.RouteName, modifiedroutes.Sno AS routesno FROM dispatch INNER JOIN dispatch_sub ON dispatch.sno = dispatch_sub.dispatch_sno INNER JOIN modifiedroutes ON dispatch_sub.Route_id = modifiedroutes.Sno INNER JOIN modifiedroutesubtable ON modifiedroutes.Sno = modifiedroutesubtable.RefNo INNER JOIN branchdata ON modifiedroutesubtable.BranchID = branchdata.sno WHERE (dispatch.sno = @routeid) AND (branchdata.flag = '1') AND (modifiedroutesubtable.EDate IS NULL) AND (modifiedroutesubtable.CDate <= @starttime) OR (dispatch.sno = @routeid) AND (branchdata.flag = '1') AND (modifiedroutesubtable.EDate > @starttime) AND (modifiedroutesubtable.CDate <= @starttime)");
                 cmd.Parameters.AddWithValue("@routeid", RouteId);
                 cmd.Parameters.AddWithValue("@starttime", DateConverter.GetHighDate(dtDispDate));
                 DataTable dtbranch = vdm.SelectQuery(cmd).Tables[0];
-
 
                 Report = new DataTable();
                 Report.Columns.Add("Sno");
@@ -3342,52 +3325,32 @@
                 Report.Columns.Add("Received Crates", typeof(Double));
                 Report.Columns.Add("CB Crates", typeof(Double));
                 DataTable dtinventary_issued = new DataTable();
-                dtinventary_issued.Merge(dtinventaryissued);
-                dtinventary_issued.Merge(dtinventaryreceived);
                 foreach (DataRow drroutebrnch in dtbranch.Rows)
                 {
-                    int Ctotcrates = 0;
-                    int Dtotcrates = 0;
-                    int oppcrates = 0;
+                    cmd = new MySqlCommand("SELECT opp_balance, issued, received, clo_balance FROM nellore_sales_2024.agent_inv_bal_trans where agentid = @agentid and doe between @d1 and @d2 and inv_sno = @InvSno ");
+                    cmd.Parameters.AddWithValue("@d1", DateConverter.GetLowDate(dtDispDate.AddDays(1)));
+                    cmd.Parameters.AddWithValue("@d2", DateConverter.GetHighDate(dtDispDate.AddDays(1)));
+                    cmd.Parameters.AddWithValue("@agentid", drroutebrnch["sno"].ToString());
+                    cmd.Parameters.AddWithValue("@InvSno", 1);
+                    DataTable dtInventary = vdm.SelectQuery(cmd).Tables[0];
                     DataRow drnew = Report.NewRow();
                     drnew["Branch Code"] = drroutebrnch["sno"].ToString();
                     drnew["Agent Name"] = drroutebrnch["BranchName"].ToString();
-                    foreach (DataRow dropp in dtinventoryopp.Select("BranchId='" + drroutebrnch["sno"].ToString() + "'"))
+                    if(dtInventary.Rows.Count > 0)
                     {
-                        if (dropp["Inv_Sno"].ToString() == "1")
-                        {
-                            int.TryParse(dropp["Qty"].ToString(), out oppcrates);
-                        }
+                        drnew["Opp Crates"] = dtInventary.Rows[0]["opp_balance"].ToString();
+                        drnew["Issued Crates"] = dtInventary.Rows[0]["issued"].ToString(); 
+                        drnew["Received Crates"] = dtInventary.Rows[0]["received"].ToString(); 
+                        drnew["CB Crates"] = dtInventary.Rows[0]["clo_balance"].ToString(); 
                     }
-                    foreach (DataRow dr in dtinventary_issued.Select("ToTran='" + drroutebrnch["sno"].ToString() + "'"))
+                    else
                     {
-                        if (dr["TransType"].ToString() == "2")
-                        {
-                            if (dr["invsno"].ToString() == "1")
-                            {
-                                int Dcrates = 0;
-                                int.TryParse(dr["Qty"].ToString(), out Dcrates);
-                                Dtotcrates += Dcrates;
-                            }
-                        }
-                        foreach (DataRow drr in dtinventary_issued.Select("FromTran='" + drroutebrnch["sno"].ToString() + "'"))
-                        {
-                            if (drr["TransType"].ToString() == "1" || drr["TransType"].ToString() == "3")
-                            {
-                                if (drr["invsno"].ToString() == "1")
-                                {
-                                    int Ccrates = 0;
-                                    int.TryParse(drr["Qty"].ToString(), out Ccrates);
-                                    Ctotcrates += Ccrates;
-                                }
-                            }
-                        }
+                        drnew["Opp Crates"] = "0";
+                        drnew["Issued Crates"] = "0";
+                        drnew["Received Crates"] = "0";
+                        drnew["CB Crates"] = "0";
                     }
-                    int CratesClo = oppcrates + Dtotcrates - Ctotcrates;
-                    drnew["Opp Crates"] = oppcrates;
-                    drnew["Issued Crates"] = Dtotcrates;
-                    drnew["Received Crates"] = Ctotcrates;
-                    drnew["CB Crates"] = CratesClo;
+                    
                     Report.Rows.Add(drnew);
 
                 }
@@ -6133,27 +6096,17 @@
                 vdm = new VehicleDBMgr();
                 string BranchID = context.Request["bid"];
                 string DairyStatus = context.Request["DairyStatus"];
+                string IndentDate = context.Session["I_Date"].ToString();
+                DateTime dtDispDate = Convert.ToDateTime(IndentDate);
                 List<Inventoryclass> InventoryList = new List<Inventoryclass>();
-                // //// cmd = new MySqlCommand("SELECT invmaster.InvName,invmaster.sno, invtransactions.Qty, invtransactions.TodayQty, inventory_monitor.Qty AS BranchQty FROM invmaster INNER JOIN invtransactions ON invmaster.sno = invtransactions.B_Inv_Sno INNER JOIN inventory_monitor ON invmaster.sno = inventory_monitor.Inv_Sno AND invtransactions.BranchId = inventory_monitor.BranchId WHERE (invtransactions.Status = @Status) AND (invtransactions.TripID = @TripID) AND (invtransactions.BranchId = @BranchId) GROUP BY invmaster.InvName, invtransactions.Status ORDER BY invmaster.sno");
-                ////  cmd = new MySqlCommand("SELECT invmaster.InvName, invmaster.sno, invtransactions.Qty,invtransactions.TodayQty, inventory_monitor.Qty AS BranchQty FROM invmaster INNER JOIN invtransactions ON invmaster.sno = invtransactions.B_Inv_Sno INNER JOIN inventory_monitor ON invtransactions.BranchId = inventory_monitor.BranchId WHERE (inventory_monitor.BranchId = @BranchId) AND (invtransactions.Status =@Status)  AND (invtransactions.TripID = @TripID)GROUP BY invmaster.InvName,invtransactions.Status");
-                if (DairyStatus == "Delivers")
-                {
-                    cmd = new MySqlCommand("SELECT invmaster.InvName, invmaster.sno, inventory_monitor.Qty AS BranchQty, invtransactions12.Qty FROM invmaster INNER JOIN inventory_monitor ON invmaster.sno = inventory_monitor.Inv_Sno INNER JOIN invtransactions12 ON invmaster.sno = invtransactions12.B_inv_sno WHERE (invtransactions12.FromTran = @FromTran) AND (invtransactions12.ToTran = @ToTrans) AND (invtransactions12.TransType = @TransType) AND (inventory_monitor.BranchId = @BranchID)GROUP BY invmaster.InvName ORDER BY invmaster.sno ");
-                    //cmd = new MySqlCommand("SELECT invmaster.InvName, invmaster.sno, inventory_monitor.Qty AS BranchQty, invtransactions12.Qty FROM invmaster INNER JOIN inventory_monitor ON invmaster.sno = inventory_monitor.Inv_Sno INNER JOIN  invtransactions12 ON invmaster.sno = invtransactions12.B_inv_sno AND inventory_monitor.BranchId = invtransactions12.FromTran WHERE (invtransactions12.FromTran = @FromTran) and (invtransactions12.ToTran = @ToTrans) AND (invtransactions12.TransType = @TransType) AND (inventory_monitor.BranchId = @BranchID) GROUP BY invmaster.InvName ORDER BY invmaster.sno");
-                    cmd.Parameters.AddWithValue("@TransType", "2");
-                    cmd.Parameters.AddWithValue("@FromTran", context.Session["TripdataSno"].ToString());
-                    cmd.Parameters.AddWithValue("@ToTrans", BranchID);
-                }
-                else
-                {
-                    // cmd = new MySqlCommand("SELECT invmaster.InvName, invmaster.sno, inventory_monitor.Qty AS BranchQty, invtransactions12.Qty FROM invmaster INNER JOIN inventory_monitor ON invmaster.sno = inventory_monitor.Inv_Sno INNER JOIN invtransactions12 ON invmaster.sno = invtransactions12.B_inv_sno WHERE (invtransactions12.FromTran = @FromTran) AND (invtransactions12.ToTran = @ToTrans) AND (invtransactions12.TransType = @TransType) AND (inventory_monitor.BranchId = @BranchID)GROUP BY invmaster.InvName ORDER BY invmaster.sno ");
-                    cmd = new MySqlCommand("SELECT invmaster.InvName, invmaster.sno, inventory_monitor.Qty AS BranchQty, invtransactions12.Qty FROM invmaster INNER JOIN inventory_monitor ON invmaster.sno = inventory_monitor.Inv_Sno INNER JOIN invtransactions12 ON invmaster.sno = invtransactions12.B_inv_sno WHERE (invtransactions12.FromTran = @FromTran) AND (invtransactions12.ToTran = @ToTrans) AND (invtransactions12.TransType = @TransType) AND (inventory_monitor.BranchId = @BranchID) GROUP BY invmaster.InvName ORDER BY invmaster.sno");
-                    cmd.Parameters.AddWithValue("@TransType", "3");
-                    cmd.Parameters.AddWithValue("@FromTran", BranchID);
-                    cmd.Parameters.AddWithValue("@ToTrans", context.Session["TripdataSno"].ToString());
-                }
-                cmd.Parameters.AddWithValue("@BranchID", BranchID);
+
+                cmd = new MySqlCommand("SELECT IM.InvName, IM.sno, AIB.opp_balance,AIB.issued,AIB.received,AIB.clo_balance FROM nellore_sales_2024.agent_inv_bal_trans AIB INNER JOIN nellore_sales_2024.invmaster IM ON IM.sno = AIB.inv_sno  where AIB.agentid = @agentid and AIB.doe between @d1 and @d2");
+                cmd.Parameters.AddWithValue("@d1", DateConverter.GetLowDate(dtDispDate.AddDays(1)));
+                cmd.Parameters.AddWithValue("@d2", DateConverter.GetHighDate(dtDispDate.AddDays(1)));
+                cmd.Parameters.AddWithValue("@agentid", BranchID);
                 DataTable dtPrevInventory = vdm.SelectQuery(cmd).Tables[0];
+
+
                 if (dtPrevInventory.Rows.Count > 0)
                 {
 
@@ -6170,23 +6123,25 @@
                         if (DairyStatus == "Delivers")
                         {
                             int BranchQty = 0;
-                            int.TryParse(dr["BranchQty"].ToString(), out BranchQty);
+                            int.TryParse(dr["opp_balance"].ToString(), out BranchQty);
                             int Qty = 0;
-                            int.TryParse(dr["Qty"].ToString(), out Qty);
-                            int ToadayQty = BranchQty - Qty;
+                            int.TryParse(dr["issued"].ToString(), out Qty);
+                            int ToadayQty = BranchQty;
                             Inventoryget.Qty = ToadayQty.ToString();
-                            Inventoryget.ToadayQty = dr["Qty"].ToString();
+                            Inventoryget.ToadayQty = dr["issued"].ToString();
                         }
                         else
                         {
                             int BranchQty = 0;
-                            int.TryParse(dr["BranchQty"].ToString(), out BranchQty);
-                            int Qty = 0;
-                            int.TryParse(dr["Qty"].ToString(), out Qty);
-                            int ToadayQty = BranchQty + Qty;
+                            int.TryParse(dr["opp_balance"].ToString(), out BranchQty);
+                            int issuedQty = 0;
+                            int.TryParse(dr["issued"].ToString(), out issuedQty);
+                            int receivedQty = 0;
+                            int.TryParse(dr["received"].ToString(), out receivedQty);
+                            int ToadayQty = BranchQty + issuedQty;
                             Inventoryget.Qty = ToadayQty.ToString();
                             //Inventoryget.Qty = BranchQty.ToString();
-                            Inventoryget.ToadayQty = dr["Qty"].ToString();
+                            Inventoryget.ToadayQty = dr["received"].ToString();
                         }
                         InventoryList.Add(Inventoryget);
                     }
